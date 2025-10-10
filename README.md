@@ -426,3 +426,7 @@ run. Use `-f` liberally.
 # Reference
 
 If you found this tool useful please cite the BIFROST paper.
+
+# Contact
+
+aberger at colorado edu 
