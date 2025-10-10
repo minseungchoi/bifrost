@@ -23,6 +23,13 @@ image is provided which can be used on all platforms.
 
 Python >=3.8 is required.
 
+As of 2025, the version of antspy `bifrost` was tested against (0.3.2) is no
+longer available as a binary from PyPI. Workaround options are to either build
+antspy 0.3.2 from source or attempt to use a version with available binary.
+[Here](https://gist.github.com/rueberger/0278990f94c530bec739deae905ca713) is an
+example of such an environment provided by a user. I am unable to officially
+endorse or provide a build at this time.
+
 `bifrost` was tested against snakemake 7.30.2. snakemake 8 moved to a plugin
 architecture for slurm support which may result in slight CLI differences.
 
