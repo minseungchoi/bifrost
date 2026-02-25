@@ -227,7 +227,7 @@ def preprocess(args, input_path, output_path):
     image = guarded_ants_image_read(input_path)
 
     if args.preprocessing is None:
-        shutil.copy(input_path, output_path)
+        ants.image_write(image, output_path)
         return
 
     if "legacy" in args.preprocessing:

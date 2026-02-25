@@ -19,10 +19,20 @@ from skimage.exposure import equalize_adapthist
 from bifrost.io import guarded_ants_image_read, md5sum, read_affine, read_image
 from bifrost.util import transpose_image, update_image_array
 
-# hide GPUs
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+import tensorflow as tf
+
 # suppress tensorflow import warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+# Enable memory growth for GPUs
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as e:
+        # Memory growth must be set before GPUs have been initialized
+        logging.warning("Failed to set memory growth for GPUs: %s", e)
 
 
 def transform(args):
@@ -244,29 +254,34 @@ def transform(args):
 
             logger.info("Applying synthmorph transform")
 
-            with tf.device("/CPU:0"):
+            device = "/GPU:0" if tf.config.list_physical_devices('GPU') else "/CPU:0"
 
-                # transform label image with nearest-neighbor interpolation
-                logger.info("Using nearest-neighbor interpolation")
-                if args.label_image:
-                    transform = vxm.networks.Transform(
-                        moving_img.shape, nb_feats=1, interp_method="nearest"
-                    )
-                    warped = transform.predict(
+            def _predict_synthmorph(use_device, is_label_image, input_img, warp_field):
+                with tf.device(use_device):
+                    if is_label_image:
+                        logger.info(f"Using nearest-neighbor interpolation on {use_device}")
+                        tfm = vxm.networks.Transform(
+                            input_img.shape, nb_feats=1, interp_method="nearest"
+                        )
+                    else:
+                        logger.info(f"Using linear interpolation on {use_device}")
+                        tfm = vxm.networks.Transform(input_img.shape, nb_feats=1)
+                    
+                    return tfm.predict(
                         [
-                            moving_img.numpy().reshape((1,) + moving_img.shape + (1,)),
-                            warp.reshape((1,) + warp.shape),
+                            input_img.numpy().reshape((1,) + input_img.shape + (1,)),
+                            warp_field.reshape((1,) + warp_field.shape),
                         ]
                     ).squeeze()
 
+            try:
+                warped = _predict_synthmorph(device, args.label_image, moving_img, warp)
+            except tf.errors.ResourceExhaustedError:
+                if device == "/GPU:0":
+                    logger.warning("GPU Out of Memory. Falling back to CPU for synthmorph.")
+                    warped = _predict_synthmorph("/CPU:0", args.label_image, moving_img, warp)
                 else:
-                    transform = vxm.networks.Transform(moving_img.shape, nb_feats=1)
-                    warped = transform.predict(
-                        [
-                            moving_img.numpy().reshape((1,) + moving_img.shape + (1,)),
-                            warp.reshape((1,) + warp.shape),
-                        ]
-                    ).squeeze()
+                    raise
 
             if lobe_mask is not None:
                 lobe_mask = (
