@@ -23,6 +23,8 @@ import tensorflow as tf
 
 # suppress tensorflow import warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+# use asynchronous allocator to help prevent OOM
+os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
 
 # Enable memory growth for GPUs
 gpus = tf.config.list_physical_devices('GPU')
